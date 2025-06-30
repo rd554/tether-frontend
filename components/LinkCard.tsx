@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Users, MoreVertical, Clock, Calendar, Edit, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -46,9 +46,26 @@ function getInitials(name = '') {
   return '?';
 }
 
-
 export default function LinkCard({ link, onEdit, onDelete, onViewDetails }: LinkCardProps) {
-  // Example helpers (customize as needed)
+  // Dropdown state and ref
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [menuOpen]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PENDING':
@@ -84,10 +101,26 @@ export default function LinkCard({ link, onEdit, onDelete, onViewDetails }: Link
           <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(link.status)}`}>
             {link.status}
           </div>
-          <div className="relative">
-            <button className="p-1 hover:bg-gray-100 rounded">
+          <div className="relative" ref={menuRef}>
+            <button
+              className="p-1 hover:bg-gray-100 rounded"
+              onClick={() => setMenuOpen((open) => !open)}
+            >
               <MoreVertical className="h-4 w-4 text-gray-400" />
             </button>
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded shadow-lg z-10">
+                <button
+                  className="flex items-center w-full px-4 py-2 text-sm text-error-600 hover:bg-error-50"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete && onDelete(link);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -132,25 +165,25 @@ export default function LinkCard({ link, onEdit, onDelete, onViewDetails }: Link
             {link.participants.slice(0, 3).map((participant: any, index: number) => {
               const user = participant.userId;
               const avatarSrc = user.avatar || getFallbackAvatar(user);
-return user.avatar || avatarSrc ? (
-  <img
-    key={user._id || index}
-    src={avatarSrc}
-    alt={user.name}
-    className="h-8 w-8 rounded-full object-cover border-2 border-white -ml-2"
-    onError={(e) => {
-      e.currentTarget.onerror = null;
-      e.currentTarget.style.display = 'none';
-    }}
-  />
-) : (
-  <div
-    key={user._id || index}
-    className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 border-2 border-white -ml-2"
-  >
-    {getInitials(user.name)}
-  </div>
-);
+              return user.avatar || avatarSrc ? (
+                <img
+                  key={user._id || index}
+                  src={avatarSrc}
+                  alt={user.name}
+                  className="h-8 w-8 rounded-full object-cover border-2 border-white -ml-2"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div
+                  key={user._id || index}
+                  className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 border-2 border-white -ml-2"
+                >
+                  {getInitials(user.name)}
+                </div>
+              );
             })}
           </div>
           {link.participants.length > 3 && (

@@ -25,6 +25,7 @@ import { format } from 'date-fns';
 import LinkDetailsOverlay from '@/components/LinkDetailsOverlay';
 import CreateLinkModal from '@/components/CreateLinkModal';
 import { useQueryClient } from 'react-query';
+import { apiClient } from '@/lib/api';
 
 // ===== DUMMY CANVAS DATA BLOCK (for demo/testing only) =====
 // Set this flag to true to use dummy data in the Link Canvas
@@ -71,6 +72,22 @@ export default function DashboardPage() {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showCanvasModal, setShowCanvasModal] = useState(false);
   const [recentLinks, setRecentLinks] = useState<any[]>(data?.recentLinks || []);
+  const allLinks = [
+    ...recentLinks,
+    ...((Array.isArray(data?.recentLinks) ? data.recentLinks : []).filter(
+      (l: any) => !recentLinks.some((r: any) => r._id === l._id)
+    )),
+  ];
+
+  const handleDeleteLink = async (linkToDelete: any) => {
+    if (!window.confirm('Are you sure you want to delete this link?')) return;
+    try {
+      await apiClient.deleteLink(linkToDelete._id);
+      setRecentLinks((prev) => prev.filter((l) => l._id !== linkToDelete._id));
+    } catch (err) {
+      alert('Failed to delete link');
+    }
+  };
 
   // Simple authentication check
   useEffect(() => {
@@ -163,12 +180,6 @@ export default function DashboardPage() {
   const handleLinkCreated = (newLink: any) => {
     setRecentLinks((prev) => [newLink, ...prev]);
   };
-
-  // Combine recentLinks and fetched links, deduplicating by _id
-  const allLinks = [
-    ...recentLinks,
-    ...data?.recentLinks.filter((l: any) => !recentLinks.some((r: any) => r._id === l._id)),
-  ];
 
   // Group links by date
   const groupLinksByDate = (links: any[]) => {
@@ -348,7 +359,12 @@ export default function DashboardPage() {
                       </div>
                       <div className="space-y-4">
                         {(links as any[]).map((link) => (
-                          <LinkCard key={link._id} link={link} onViewDetails={() => setSelectedLink(link)} />
+                           <LinkCard
+                           key={link._id}
+                           link={link}
+                           onViewDetails={() => setSelectedLink(link)}
+                           onDelete={handleDeleteLink}
+                         />
                         ))}
                       </div>
                     </div>
