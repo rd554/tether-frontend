@@ -4,6 +4,18 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useCreateTeam } from '@/hooks/useTeams';
 import { apiClient } from '@/lib/api';
+// Helper to get current test user from localStorage
+function getCurrentTestUser() {
+  if (typeof window !== 'undefined') {
+    const userStr = localStorage.getItem('tetherUser');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch {}
+    }
+  }
+  return null;
+}
 
 interface CreateTeamModalProps {
   isOpen: boolean;
@@ -11,6 +23,9 @@ interface CreateTeamModalProps {
 }
 
 export default function CreateTeamModal({ isOpen, onClose }: CreateTeamModalProps) {
+  const currentUser = typeof window !== 'undefined' ? getCurrentTestUser() : null;
+  const [pmName, setPmName] = useState(currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '');
+  const [pmEmail, setPmEmail] = useState(currentUser ? currentUser.email || '' : '');
   const [formData, setFormData] = useState({
     name: '',
     productName: '',
@@ -27,6 +42,15 @@ export default function CreateTeamModal({ isOpen, onClose }: CreateTeamModalProp
     e.preventDefault();
     setTeammateError('');
     try {
+      // Update PM's global profile with new name and email (required)
+      const [firstName, ...rest] = pmName.trim().split(' ');
+      const lastName = rest.length > 0 ? rest.join(' ') : 'PM';
+      await apiClient.updateUserProfile({ firstName, lastName, role: 'PM' });
+      // Also update localStorage for immediate UI consistency
+      if (currentUser) {
+        const updatedUser = { ...currentUser, firstName, lastName, email: pmEmail, role: 'PM' };
+        localStorage.setItem('tetherUser', JSON.stringify(updatedUser));
+      }
       // Ensure name is set for backend compatibility
       const payload = { ...formData, name: formData.productName };
       // Create team (without productStage)
@@ -37,8 +61,9 @@ export default function CreateTeamModal({ isOpen, onClose }: CreateTeamModalProp
           try {
             await apiClient.addTeamMember(team._id, {
               email: tm.email,
-              role: tm.department,
-              firstName: tm.name
+              name: tm.name,
+              department: tm.department,
+              designation: tm.role // designation is stored in tm.role input
             });
           } catch (err) {
             setTeammateError(`Failed to add teammate: ${tm.email}`);
@@ -84,6 +109,39 @@ export default function CreateTeamModal({ isOpen, onClose }: CreateTeamModalProp
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* PM Rename Section */}
+            <div>
+              <label htmlFor="pmName" className="block text-sm font-medium text-gray-700 mb-1">
+                Rename PM (You) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="pmName"
+                name="pmName"
+                value={pmName}
+                onChange={e => setPmName(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="Enter your name as PM"
+              />
+            </div>
+            {/* PM Email Section */}
+            <div>
+              <label htmlFor="pmEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                PM Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                id="pmEmail"
+                name="pmEmail"
+                value={pmEmail}
+                onChange={e => setPmEmail(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="Enter your email as PM"
+              />
+            </div>
+
             <div>
               <label htmlFor="productName" className="block text-sm font-medium text-gray-700 mb-1">
                 Project Name *
@@ -147,13 +205,13 @@ export default function CreateTeamModal({ isOpen, onClose }: CreateTeamModalProp
                     onChange={(e) => handleTeammateChange(idx, 'department', e.target.value)}
                   >
                     <option value="" disabled>Select Department</option>
-                    <option value="Product">Product</option>
-                    <option value="Dev">Dev</option>
-                    <option value="Design">Design</option>
-                    <option value="Legal">Legal</option>
-                    <option value="Security">Security</option>
-                    <option value="Biz Ops">Biz Ops</option>
-                    <option value="Stakeholder">Stakeholder</option>
+                    <option value="PM">PM</option>
+                    <option value="DEV">DEV</option>
+                    <option value="DESIGN">DESIGN</option>
+                    <option value="LEGAL">LEGAL</option>
+                    <option value="SECURITY">SECURITY</option>
+                    <option value="BIZ_OPS">BIZ_OPS</option>
+                    <option value="STAKEHOLDER">STAKEHOLDER</option>
                   </select>
                   {teammates.length > 1 && (
                     <button type="button" onClick={() => removeTeammate(idx)} className="btn-error px-2 py-1">&times;</button>

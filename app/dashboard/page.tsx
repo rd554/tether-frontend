@@ -61,29 +61,37 @@ const dummyLinks = [
 // ===== DEBUG: Render Link Canvas directly on dashboard (not in modal) =====
 // const DEBUG_CANVAS_ON_PAGE = true;
 
+// Helper to pick a consistent avatar based on username or email
+function getConsistentAvatar(user: any) {
+  const avatarCount = 10;
+  const basePath = '/avatars/avatar';
+  const key = user?.email || user?.username || 'default';
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = key.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % avatarCount + 1;
+  return `${basePath}${index}.png`;
+}
+
 export default function DashboardPage() {
   const { selectedTeam, setSelectedTeam, clearAll } = useTeamStore();
   const { data, isLoading, error, refetch } = useDashboardData();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [selectedLink, setSelectedLink] = useState<any>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showCanvasModal, setShowCanvasModal] = useState(false);
-  const [recentLinks, setRecentLinks] = useState<any[]>(data?.recentLinks || []);
-  const allLinks = [
-    ...recentLinks,
-    ...((Array.isArray(data?.recentLinks) ? data.recentLinks : []).filter(
-      (l: any) => !recentLinks.some((r: any) => r._id === l._id)
-    )),
-  ];
+
+  // Use data?.recentLinks directly
+  const allLinks = data?.recentLinks || [];
 
   const handleDeleteLink = async (linkToDelete: any) => {
     if (!window.confirm('Are you sure you want to delete this link?')) return;
     try {
       await apiClient.deleteLink(linkToDelete._id);
-      setRecentLinks((prev) => prev.filter((l) => l._id !== linkToDelete._id));
+      // setRecentLinks((prev) => prev.filter((l) => l._id !== linkToDelete._id)); // This line is removed
     } catch (err) {
       alert('Failed to delete link');
     }
@@ -95,10 +103,6 @@ export default function DashboardPage() {
       window.location.href = '/';
     }
   }, []);
-
-  useEffect(() => {
-    setRecentLinks(data?.recentLinks || []);
-  }, [data?.recentLinks]);
 
   // Add click-away handler for user menu
   useEffect(() => {
@@ -113,15 +117,13 @@ export default function DashboardPage() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [userMenuOpen]);
 
-  // Simple sign out function
+  // Robust sign out function for test user system
   const handleSignOut = () => {
     try {
-      console.log('Sign out button clicked!');
-      localStorage.clear();
+      localStorage.removeItem('tether_token');
+      localStorage.removeItem('tetherUser');
       sessionStorage.clear();
-      queryClient.clear();
-      clearAll();
-      console.log('All storage cleared, redirecting to home...');
+      clearAll && clearAll();
       window.location.href = '/';
     } catch (err) {
       console.error('Error during sign out:', err);
@@ -158,7 +160,9 @@ export default function DashboardPage() {
     );
   }
 
-  const filteredLinks = recentLinks.filter(link => 
+  // Remove the JSON dump and console.log, restore the full dashboard UI below
+
+  const filteredLinks = allLinks.filter(link => 
     link.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     link.purpose.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
@@ -176,9 +180,11 @@ export default function DashboardPage() {
   }, {});
   const sortedDates = Object.keys(groupedLinks).sort((a, b) => b.localeCompare(a));
 
-  // When a new link is created, prepend it to recentLinks
-  const handleLinkCreated = (newLink: any) => {
-    setRecentLinks((prev) => [newLink, ...prev]);
+  // When a new link is created, just refetch dashboard data
+  const handleLinkCreated = () => {
+    if (typeof refetch === 'function') {
+      refetch();
+    }
   };
 
   // Group links by date
@@ -217,54 +223,18 @@ export default function DashboardPage() {
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
-              
               {/* Notifications */}
               <button className="relative p-2 text-gray-400 hover:text-gray-600">
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400"></span>
               </button>
-              
-              {/* User Menu */}
-              <div className="relative">
-                <button
-                  className="flex items-center space-x-2 focus:outline-none"
-                  onClick={() => setUserMenuOpen((open) => !open)}
-                  id="user-menu-button"
-                >
-                  {data?.user?.avatar ? (
-                    <img
-                      src={data.user.avatar}
-                      alt={data.user.name || data.user.email || 'User'}
-                      className="h-8 w-8 rounded-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  ) : (
-                    <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-lg">
-                      {data?.user?.name
-                        ? data.user.name.split(' ').map(n => n[0]).join('').toUpperCase()
-                        : data?.user?.email
-                          ? data.user.email[0].toUpperCase()
-                          : '?'}
-                    </div>
-                  )}
-                  <span className="text-sm font-medium text-gray-700">
-                    {data?.user?.name || data?.user?.email || 'User'}
-                  </span>
-                </button>
-                {userMenuOpen && (
-                  <div className="absolute left-0 right-auto mt-2 min-w-[8rem] bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-2 flex flex-col items-stretch">
-                    {/* Caret/arrow */}
-                    <div className="absolute -top-2 left-4 w-3 h-3 bg-white border-l border-t border-gray-200 rotate-45 z-10"></div>
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
+              {/* Sign Out Button styled to match app UI */}
+              <button
+                onClick={handleSignOut}
+                className="bg-primary-600 text-white rounded-lg px-4 py-2 hover:bg-primary-700 transition-colors"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
         </div>
@@ -430,10 +400,32 @@ export default function DashboardPage() {
         onSuccess={handleLinkCreated}
       />
 
-      <LinkCanvasModal
-        isOpen={showCanvasModal}
-        onClose={() => setShowCanvasModal(false)}
-      />
+      {/* Link Canvas Modal: Only show the most recent link's PM and participant */}
+      {allLinks.length > 0 && (
+        <LinkCanvasModal
+          isOpen={showCanvasModal}
+          onClose={() => setShowCanvasModal(false)}
+          users={(() => {
+            // Aggregate PM and all unique participants from all links
+            const pmSet = new Map();
+            const participantSet = new Map();
+            allLinks.forEach(link => {
+              link.participants.forEach((p: any) => {
+                if (p.role === 'INITIATOR' && p.userId) {
+                  pmSet.set(p.userId._id, { ...p.userId, role: 'PM' });
+                } else if (p.role !== 'INITIATOR' && p.userId) {
+                  participantSet.set(p.userId._id, { ...p.userId, role: p.role || '' });
+                }
+              });
+            });
+            // Use the first PM found (should be the same for all links in this team)
+            const pmUser = Array.from(pmSet.values())[0];
+            const participantUsers = Array.from(participantSet.values());
+            return [pmUser, ...participantUsers].filter(Boolean);
+          })()}
+          links={allLinks}
+        />
+      )}
     </div>
   );
 } 

@@ -22,7 +22,22 @@ export default function QuickActions() {
       description: 'Log a new collaboration or meeting',
       icon: LinkIcon,
       color: 'success',
-      onClick: () => setShowLinkModal(true),
+      onClick: () => {
+        const userStr = typeof window !== 'undefined' ? localStorage.getItem('tetherUser') : null;
+        let user: any = null;
+        try { user = userStr ? JSON.parse(userStr) : null; } catch {}
+        console.log('[QuickActions] Create Link clicked. User:', user);
+        if (!selectedTeam) {
+          console.log('[QuickActions] No team selected.');
+        } else if (!user) {
+          console.log('[QuickActions] No user found.');
+        } else if (user.role !== 'PM') {
+          console.log('[QuickActions] User is not PM. Role:', user.role);
+        } else {
+          console.log('[QuickActions] Opening Create Link modal.');
+          setShowLinkModal(true);
+        }
+      },
       disabled: !selectedTeam
     },
     {
@@ -102,7 +117,7 @@ export default function QuickActions() {
             <span className="text-sm text-yellow-800">
               Select a team to access quick actions
             </span>
-          </div>
+         </div>
         </div>
       )}
 

@@ -13,7 +13,7 @@ export default function AddMemberModal({ isOpen, onClose, onMemberAdded }: AddMe
   const { teams = [], loading: teamsLoading } = useTeams();
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
   const [teammates, setTeammates] = useState([
-    { firstName: '', email: '', designation: '', department: '' }
+    { name: '', email: '', designation: '', department: '' }
   ]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -23,7 +23,7 @@ export default function AddMemberModal({ isOpen, onClose, onMemberAdded }: AddMe
     setTeammates(prev => prev.map((tm, i) => i === idx ? { ...tm, [field]: value } : tm));
   };
 
-  const addTeammate = () => setTeammates([...teammates, { firstName: '', email: '', designation: '', department: '' }]);
+  const addTeammate = () => setTeammates([...teammates, { name: '', email: '', designation: '', department: '' }]);
   const removeTeammate = (idx: number) => setTeammates(teammates.filter((_, i) => i !== idx));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,16 +39,18 @@ export default function AddMemberModal({ isOpen, onClose, onMemberAdded }: AddMe
       console.log('DEBUG: teammates array:', teammates);
       for (const tm of teammates) {
         if (tm.email && tm.department) {
-          const payload = {
+          const payload: any = {
             email: tm.email,
-            role: tm.department
+            name: tm.name,
+            department: tm.department, // send department as required by backend
+            designation: tm.designation // send designation as free text
           };
           console.log('DEBUG: Adding member payload:', payload);
           await apiClient.addTeamMember(selectedTeamId, payload);
         }
       }
       setSuccess(true);
-      setTeammates([{ firstName: '', email: '', designation: '', department: '' }]);
+      setTeammates([{ name: '', email: '', designation: '', department: '' }]);
       if (onMemberAdded) onMemberAdded();
       setTimeout(() => {
         setSuccess(false);
@@ -103,10 +105,10 @@ export default function AddMemberModal({ isOpen, onClose, onMemberAdded }: AddMe
                 <div key={idx} className="flex gap-2 mb-2 items-center">
                   <input
                     type="text"
-                    placeholder="First Name"
+                    placeholder="Name"
                     className="input-field flex-1"
-                    value={tm.firstName}
-                    onChange={(e) => handleTeammateChange(idx, 'firstName', e.target.value)}
+                    value={tm.name}
+                    onChange={(e) => handleTeammateChange(idx, 'name', e.target.value)}
                   />
                   <input
                     type="email"
@@ -128,13 +130,13 @@ export default function AddMemberModal({ isOpen, onClose, onMemberAdded }: AddMe
                     onChange={(e) => handleTeammateChange(idx, 'department', e.target.value)}
                   >
                     <option value="" disabled>Select Department</option>
-                    <option value="PM">Product Manager</option>
-                    <option value="DEV">Dev</option>
-                    <option value="DESIGN">Design</option>
-                    <option value="LEGAL">Legal</option>
-                    <option value="SECURITY">Security</option>
-                    <option value="BIZ_OPS">Biz Ops</option>
-                    <option value="STAKEHOLDER">Stakeholder</option>
+                    <option value="PM">PM</option>
+                    <option value="DEV">DEV</option>
+                    <option value="DESIGN">DESIGN</option>
+                    <option value="LEGAL">LEGAL</option>
+                    <option value="SECURITY">SECURITY</option>
+                    <option value="BIZ_OPS">BIZ_OPS</option>
+                    <option value="STAKEHOLDER">STAKEHOLDER</option>
                   </select>
                   {teammates.length > 1 && (
                     <button type="button" onClick={() => removeTeammate(idx)} className="btn-error px-2 py-1">&times;</button>

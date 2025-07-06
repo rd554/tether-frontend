@@ -14,9 +14,23 @@ interface CreateLinkModalProps {
   onSuccess?: (newLink: any) => void;
 }
 
+// Helper to get current test user from localStorage
+function getCurrentTestUser() {
+  if (typeof window !== 'undefined') {
+    const userStr = localStorage.getItem('tetherUser');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch {}
+    }
+  }
+  return null;
+}
+
 export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLinkModalProps) {
   const { selectedTeam } = useTeamStore();
   const { data: members = [], refetch } = useTeamMembers(selectedTeam?._id);
+  const currentUser = typeof window !== 'undefined' ? getCurrentTestUser() : null;
 
   const [formData, setFormData] = useState({
     title: '',
@@ -30,6 +44,16 @@ export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLi
 
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
+  // Auto-select PM as participant on open
+  useEffect(() => {
+    if (isOpen && currentUser && members.length > 0) {
+      const pmMember = members.find((m: any) => m.userId && (m.userId._id === currentUser._id || m.userId.email === currentUser.email));
+      if (pmMember) {
+        setSelectedParticipants((prev) => prev.includes(pmMember.userId._id) ? prev : [pmMember.userId._id, ...prev]);
+      }
+    }
+  }, [isOpen, currentUser, members]);
+
   useEffect(() => {
     if (isOpen) {
       refetch();
@@ -40,7 +64,10 @@ export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLi
   const memberOptions = members.map((member: any) => {
     const user = member.userId;
     let label = '';
-    if (user.name && user.email) {
+    if (currentUser && (user._id === currentUser._id || user.email === currentUser.email)) {
+      // Always use currentUser's latest firstName/lastName for PM label
+      label = `${currentUser.firstName || ''} ${currentUser.lastName || ''} (You, PM)`;
+    } else if (user.name && user.email) {
       label = `${user.name} (${user.email})`;
     } else if (user.name) {
       label = user.name;
@@ -51,7 +78,8 @@ export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLi
     }
     return {
       value: user._id || user,
-      label
+      label,
+      isPM: currentUser && (user._id === currentUser._id || user.email === currentUser.email)
     };
   });
 
@@ -59,7 +87,19 @@ export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLi
   const selectedOptions = memberOptions.filter(opt => selectedParticipants.includes(opt.value));
 
   const handleParticipantsChange = (selected: any) => {
-    setSelectedParticipants(selected ? selected.map((opt: any) => opt.value) : []);
+    // Always keep PM in the list
+    if (currentUser) {
+      const pmOption = memberOptions.find(opt => opt.isPM);
+      const pmId = pmOption?.value;
+      const newIds = selected ? selected.map((opt: any) => opt.value) : [];
+      if (pmId && !newIds.includes(pmId)) {
+        setSelectedParticipants([pmId, ...newIds]);
+      } else {
+        setSelectedParticipants(newIds);
+      }
+    } else {
+      setSelectedParticipants(selected ? selected.map((opt: any) => opt.value) : []);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,6 +165,11 @@ export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLi
   };
 
   if (!isOpen) return null;
+
+  // Only allow PMs to create a link
+  if (currentUser && currentUser.role !== 'PM') {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -273,6 +318,7 @@ export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLi
                   onChange={handleParticipantsChange}
                   classNamePrefix="react-select"
                   placeholder="Select participants..."
+                  isOptionDisabled={option => option.isPM}
                 />
               </div>
             )}
