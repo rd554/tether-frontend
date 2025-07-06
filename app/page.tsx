@@ -28,25 +28,7 @@ export default function HomePage() {
     }
   }, []);
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
-    try {
-      localStorage.setItem('tether_token', credentialResponse.credential);
-      const res = await axios.post(
-        process.env.NEXT_PUBLIC_API_URL + '/api/auth/google',
-        { idToken: credentialResponse.credential }
-      );
-      setUser(res.data.user as User);
-      setError("");
-      if (res.data.user.onboarded) {
-        router.push('/dashboard');
-      } else {
-        router.push('/onboarding');
-      }
-      setTokenPresent(true);
-    } catch (err: any) {
-      setError(err?.response?.data?.error || "Google login failed");
-    }
-  };
+  // Remove handleGoogleSuccess and any Google login logic
 
   const handleSignOut = () => {
     try {
