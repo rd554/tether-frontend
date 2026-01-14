@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { api } from '@/lib/api';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -19,14 +20,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
     setError('');
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      const res = await fetch(`${apiUrl}/api/auth/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const res = await api.post('/api/auth/test', { username, password });
+      const data = res.data;
+      if (res.status === 200 && data.success) {
         // Always set role to PM for test users
         const user = { ...data.user, role: 'PM' };
         localStorage.setItem('tetherUser', JSON.stringify(user));
@@ -37,8 +33,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
       } else {
         setError(data.message || 'Login failed');
       }
-    } catch (err) {
-      setError('Network error');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err?.response?.data?.message || 'Network error. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -83,4 +80,4 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
   );
 };
 
-export default LoginModal; 
+export default LoginModal;
