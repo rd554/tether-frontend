@@ -4,7 +4,7 @@ import axios from 'axios';
 // Create axios instance
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
-  timeout: 10000,
+  timeout: 30000, // Increased to 30 seconds for Railway cold starts
   headers: {
     'Content-Type': 'application/json',
   },

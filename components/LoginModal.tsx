@@ -35,7 +35,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err?.response?.data?.message || 'Network error. Please check your connection.');
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Request timeout. The backend may be starting up. Please try again in a few seconds.');
+      } else if (err.response) {
+        setError(err.response.data?.message || 'Login failed. Please check your credentials.');
+      } else {
+        setError('Network error. Please check your connection and ensure the backend is running.');
+      }
     } finally {
       setLoading(false);
     }
